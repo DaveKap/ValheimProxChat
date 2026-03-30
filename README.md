@@ -33,6 +33,36 @@ A free, open-source BepInEx mod that adds **proximity-based voice chat** to Valh
 2. Search for "ValheimProxChat"
 3. Click Install
 
+## Server / Host Setup
+
+ValheimProxChat uses Valheim's built-in `ZRoutedRpc` networking to send voice data. This means **no extra ports, no external voice servers, and no special server-side configuration** are required. Voice packets travel over the same connection players already use to play the game.
+
+### Peer-to-peer (host-and-play)
+
+No extra steps. The hosting player's game client relays RPCs to all connected peers automatically. Just make sure every player has the mod installed.
+
+### Dedicated Server
+
+Dedicated servers relay `ZRoutedRpc` messages between clients, even for RPCs the server itself doesn't "know" about. Because of this:
+
+- **The mod does NOT need to be installed on the dedicated server.** Voice packets will still be relayed between clients.
+- **However, installing it on the server is recommended** if you want to guarantee compatibility and make future features (such as server-side muting or admin controls) possible. To install on a dedicated server:
+  1. Install BepInEx 5 on the dedicated server (same Denikson pack used by clients)
+  2. Place `ValheimProxChat.dll` into the server's `BepInEx/plugins/` folder
+  3. Restart the server
+
+### Important Notes for Server Owners
+
+| Topic | Details |
+|-------|---------|
+| **Player requirement** | All players who want to use voice chat must have the mod installed. Players without it will simply not hear or send voice — there is no disruption to their gameplay. |
+| **Bandwidth** | Each speaking player adds ~16 KB/s of traffic (at default 16 kHz / mu-law settings). For a 10-player server where 2-3 people speak at once, expect an extra ~50 KB/s peak. This is negligible for most hosts. |
+| **Reducing bandwidth** | Lower the `SampleRate` to `8000` in the config to cut traffic roughly in half (~8 KB/s per speaker) at the cost of lower voice quality. |
+| **No open ports needed** | Voice data piggybacks on Valheim's existing game connection. If players can connect to your server, voice chat will work — no firewall or port-forwarding changes required. |
+| **Mod version matching** | All clients should run the same version of ValheimProxChat to avoid packet format mismatches. |
+| **Enforcing the mod** | Valheim does not natively enforce client-side mods. If you want to require it, use a server-side mod-enforcement plugin or communicate the requirement to your players. |
+| **Muting / admin controls** | Not yet implemented. Players can mute themselves by not pressing PTT or disabling their mic. Server-side mute support is planned for a future release. |
+
 ## Configuration
 
 After first launch, a config file is created at:
