@@ -14,47 +14,28 @@
   <!--
     Valheim modding references.
 
-    The build will auto-detect your Valheim install from common Steam locations.
-    If auto-detection fails, set the VALHEIM_INSTALL environment variable:
+    Set VALHEIM_INSTALL before building, or create Environment.props next to this file:
 
-      Windows:  set VALHEIM_INSTALL=C:\Program Files (x86)\Steam\steamapps\common\Valheim
-      Linux:    export VALHEIM_INSTALL=$HOME/.steam/steam/steamapps/common/Valheim
+      set VALHEIM_INSTALL=C:\Program Files (x86)\Steam\steamapps\common\Valheim
+      dotnet build -c Release
 
-    Or create a file called Environment.props next to this csproj with:
-      <Project>
-        <PropertyGroup>
-          <ValheimInstall>C:\your\path\to\Valheim</ValheimInstall>
-        </PropertyGroup>
-      </Project>
+    Or create Environment.props:
+      <Project><PropertyGroup>
+        <ValheimInstall>C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimInstall>
+      </PropertyGroup></Project>
   -->
 
-  <!-- Import optional user-local overrides (not committed to git) -->
   <Import Project="Environment.props" Condition="Exists('Environment.props')" />
 
   <PropertyGroup>
-    <!-- Use VALHEIM_INSTALL env var if set -->
-    <ValheimInstall Condition="'$(ValheimInstall)' == '' AND '$(VALHEIM_INSTALL)' != ''">$(VALHEIM_INSTALL)</ValheimInstall>
-
-    <!-- Windows: common Steam install locations -->
-    <ValheimInstall Condition="'$(ValheimInstall)' == '' AND Exists('C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim.exe')">C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimInstall>
-    <ValheimInstall Condition="'$(ValheimInstall)' == '' AND Exists('C:\Program Files\Steam\steamapps\common\Valheim\valheim.exe')">C:\Program Files\Steam\steamapps\common\Valheim</ValheimInstall>
-    <ValheimInstall Condition="'$(ValheimInstall)' == '' AND Exists('D:\Steam\steamapps\common\Valheim\valheim.exe')">D:\Steam\steamapps\common\Valheim</ValheimInstall>
-    <ValheimInstall Condition="'$(ValheimInstall)' == '' AND Exists('D:\SteamLibrary\steamapps\common\Valheim\valheim.exe')">D:\SteamLibrary\steamapps\common\Valheim</ValheimInstall>
-
-    <!-- Linux: common Steam install location -->
-    <ValheimInstall Condition="'$(ValheimInstall)' == '' AND Exists('$(HOME)/.steam/steam/steamapps/common/Valheim')">$(HOME)/.steam/steam/steamapps/common/Valheim</ValheimInstall>
-
-    <!-- Derived paths -->
+    <ValheimInstall Condition="'$(ValheimInstall)' == ''">$(VALHEIM_INSTALL)</ValheimInstall>
     <ValheimManaged>$(ValheimInstall)\valheim_Data\Managed</ValheimManaged>
     <BepInExDir>$(ValheimInstall)\BepInEx\core</BepInExDir>
-    <UnstrippedDir>$(ValheimInstall)\unstripped_corlib</UnstrippedDir>
   </PropertyGroup>
 
-  <!-- Warn if Valheim install was not found -->
   <Target Name="CheckValheimInstall" BeforeTargets="ResolveAssemblyReferences">
-    <Warning Text="Valheim install not found. Set the VALHEIM_INSTALL environment variable or create Environment.props. See csproj comments for details."
-             Condition="'$(ValheimInstall)' == '' OR !Exists('$(ValheimInstall)')" />
-    <Message Importance="high" Text="Using Valheim install: $(ValheimInstall)" Condition="Exists('$(ValheimInstall)')" />
+    <Error Text="VALHEIM_INSTALL is not set. Set the environment variable or create Environment.props. Example: set VALHEIM_INSTALL=C:\Program Files (x86)\Steam\steamapps\common\Valheim"
+           Condition="'$(ValheimInstall)' == ''" />
   </Target>
 
   <ItemGroup>
@@ -68,46 +49,23 @@
       <Private>false</Private>
     </Reference>
 
-    <!--
-      Unity Engine: prefer unstripped_corlib if available (BepInEx pack provides these),
-      fall back to valheim_Data\Managed otherwise.
-    -->
-    <Reference Include="UnityEngine" Condition="Exists('$(UnstrippedDir)\UnityEngine.dll')">
-      <HintPath>$(UnstrippedDir)\UnityEngine.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine" Condition="!Exists('$(UnstrippedDir)\UnityEngine.dll')">
+    <!-- Unity Engine (from valheim_Data\Managed) -->
+    <Reference Include="UnityEngine">
       <HintPath>$(ValheimManaged)\UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
-
-    <Reference Include="UnityEngine.CoreModule" Condition="Exists('$(UnstrippedDir)\UnityEngine.CoreModule.dll')">
-      <HintPath>$(UnstrippedDir)\UnityEngine.CoreModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule" Condition="!Exists('$(UnstrippedDir)\UnityEngine.CoreModule.dll')">
+    <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ValheimManaged)\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-
-    <Reference Include="UnityEngine.AudioModule" Condition="Exists('$(UnstrippedDir)\UnityEngine.AudioModule.dll')">
-      <HintPath>$(UnstrippedDir)\UnityEngine.AudioModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.AudioModule" Condition="!Exists('$(UnstrippedDir)\UnityEngine.AudioModule.dll')">
+    <Reference Include="UnityEngine.AudioModule">
       <HintPath>$(ValheimManaged)\UnityEngine.AudioModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-
-    <Reference Include="UnityEngine.InputLegacyModule" Condition="Exists('$(UnstrippedDir)\UnityEngine.InputLegacyModule.dll')">
-      <HintPath>$(UnstrippedDir)\UnityEngine.InputLegacyModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.InputLegacyModule" Condition="!Exists('$(UnstrippedDir)\UnityEngine.InputLegacyModule.dll')">
+    <Reference Include="UnityEngine.InputLegacyModule">
       <HintPath>$(ValheimManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-
     <Reference Include="UnityEngine.UI">
       <HintPath>$(ValheimManaged)\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
