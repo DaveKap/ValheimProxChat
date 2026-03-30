@@ -104,10 +104,20 @@ namespace ValheimProxChat.Network
 
                 // Calculate volume based on distance
                 float volume = CalculateProximityVolume(distance);
-                volume *= Configuration.OutputVolume.Value;
 
                 // Decompress audio
                 float[] samples = AudioCompression.Decompress(compressedData, 0, compressedData.Length);
+
+                // Apply output volume boost directly to samples since Unity clamps
+                // AudioSource.volume to 0-1, which prevents amplification above 1x
+                float outputGain = Configuration.OutputVolume.Value;
+                if (outputGain > 0.001f)
+                {
+                    for (int i = 0; i < samples.Length; i++)
+                    {
+                        samples[i] *= outputGain;
+                    }
+                }
 
                 // Hand off to the playback manager
                 _playbackManager.PlayVoiceChunk(playerId, playerName, senderPosition, samples, sampleRate, volume);
