@@ -94,7 +94,9 @@ namespace ValheimProxChat.Audio
         private void Update()
         {
             if (!_isRecording || _micClip == null) return;
-            if (!Plugin.IsVoiceChatActive()) return;
+
+            // Always update mic level for UI, even when voice chat is paused (menu open)
+            bool canTransmit = Plugin.IsVoiceChatActive();
 
             _transmitTimer += Time.unscaledDeltaTime;
             if (_transmitTimer < Configuration.EffectiveTransmitInterval) return;
@@ -146,9 +148,16 @@ namespace ValheimProxChat.Audio
                 }
             }
 
-            // Calculate audio level for voice activation and UI
+            // Calculate audio level (after boost, for accurate UI display)
             float level = CalculateRmsLevel(_readBuffer, samplesToRead);
             CurrentLevel = level;
+
+            // Don't transmit when menus are open, but keep updating the level above
+            if (!canTransmit)
+            {
+                IsSpeaking = false;
+                return;
+            }
 
             // Determine if we should transmit
             bool shouldTransmit = false;

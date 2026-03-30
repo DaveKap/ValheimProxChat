@@ -10,7 +10,10 @@ A free, open-source BepInEx mod that adds **proximity-based voice chat** to Valh
 - **Visual indicators**: See who's speaking with on-screen icons above players
 - **Microphone level display**: Real-time volume bar shows your mic input level
 - **Low bandwidth**: Mu-law compression reduces audio data by 50% with minimal quality loss
+- **Low latency**: 20ms transmit interval with immediate playback — no pre-buffering delay
 - **No external servers**: All voice data travels through Valheim's built-in networking (ZRoutedRpc)
+- **Live config reload**: Edit the .cfg file while playing — changes apply instantly
+- **Low bandwidth mode**: Optional setting for players on slower or overseas connections
 - **Fully configurable**: Adjust sample rate, volume, distances, keybinds, and more via BepInEx config
 
 ## Requirements
@@ -56,8 +59,8 @@ Dedicated servers relay `ZRoutedRpc` messages between clients, even for RPCs the
 | Topic | Details |
 |-------|---------|
 | **Player requirement** | All players who want to use voice chat must have the mod installed. Players without it will simply not hear or send voice — there is no disruption to their gameplay. |
-| **Bandwidth** | Each speaking player adds ~16 KB/s of traffic (at default 16 kHz / mu-law settings). For a 10-player server where 2-3 people speak at once, expect an extra ~50 KB/s peak. This is negligible for most hosts. |
-| **Reducing bandwidth** | Lower the `SampleRate` to `8000` in the config to cut traffic roughly in half (~8 KB/s per speaker) at the cost of lower voice quality. |
+| **Bandwidth** | Each speaking player adds ~22 KB/s of traffic (at default 22050 Hz / mu-law settings). For a 10-player server where 2-3 people speak at once, expect an extra ~66 KB/s peak. This is negligible for most hosts. |
+| **Reducing bandwidth** | Enable `LowBandwidthMode` in the config (~8 KB/s per speaker), or manually lower `SampleRate` to `8000` and increase `TransmitInterval` to `0.1`. |
 | **No open ports needed** | Voice data piggybacks on Valheim's existing game connection. If players can connect to your server, voice chat will work — no firewall or port-forwarding changes required. |
 | **Mod version matching** | All clients should run the same version of ValheimProxChat to avoid packet format mismatches. |
 | **Enforcing the mod** | Valheim does not natively enforce client-side mods. If you want to require it, use a server-side mod-enforcement plugin or communicate the requirement to your players. |
@@ -70,15 +73,18 @@ After first launch, a config file is created at:
 Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 ```
 
+**Config changes are applied live** — just save the file and they take effect immediately, no restart needed.
+
 ### Audio Settings
 | Setting | Default | Description |
 |---------|---------|-------------|
-| MaxVoiceDistance | 25 | Maximum hearing distance (meters) |
+| MaxVoiceDistance | 50 | Maximum hearing distance (meters) |
 | FadeStartDistance | 5 | Distance where volume starts fading |
-| MicrophoneBoost | 1.0 | Mic input multiplier |
-| OutputVolume | 1.0 | Playback volume multiplier |
-| SampleRate | 16000 | Audio quality (8000/16000/22050 Hz) |
+| MicrophoneBoost | 1.5 | Mic input multiplier (1.0 = no boost) |
+| OutputVolume | 2.0 | Playback volume gain (applied to audio samples, not clamped to 1.0) |
+| SampleRate | 22050 | Audio quality (8000/16000/22050 Hz) |
 | MicrophoneDevice | (empty) | Specific mic device name, or empty for default |
+| ReverbMix | 0.0 | Valheim reverb zone mix (0.0 = no reverb, 1.0 = full) |
 
 ### Input Settings
 | Setting | Default | Description |
@@ -91,7 +97,8 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 ### Network Settings
 | Setting | Default | Description |
 |---------|---------|-------------|
-| TransmitInterval | 0.1 | Seconds between voice packets |
+| TransmitInterval | 0.02 | Seconds between voice packets (20ms) |
+| LowBandwidthMode | false | Forces 8000Hz / 100ms for slower connections (~8 KB/s) |
 
 ### UI Settings
 | Setting | Default | Description |
@@ -102,7 +109,7 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 ## Building from Source
 
 ### Prerequisites
-- .NET SDK 6.0+ (or Visual Studio / Rider with .NET Framework 4.6.2 targeting pack)
+- .NET SDK 6.0+
 - Valheim installed with BepInEx 5 (Denikson pack)
 
 ### Build Steps
@@ -112,15 +119,17 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
    ```bash
    # Linux
    export VALHEIM_INSTALL="$HOME/.steam/steam/steamapps/common/Valheim"
-
-   # Windows
-   set VALHEIM_INSTALL=C:\Program Files (x86)\Steam\steamapps\common\Valheim
-   ```
-3. Build:
-   ```bash
    dotnet build ValheimProxChat/ValheimProxChat.csproj -c Release
+
+   # Windows (note: quotes around the entire set argument to handle parentheses)
+   set "VALHEIM_INSTALL=C:\Program Files (x86)\Steam\steamapps\common\Valheim"
+   dotnet build ValheimProxChat\ValheimProxChat.csproj -c Release
    ```
-4. The output DLL will be in `ValheimProxChat/bin/Release/net462/`
+   Or pass it directly to MSBuild:
+   ```bash
+   dotnet build ValheimProxChat/ValheimProxChat.csproj -c Release -p:ValheimInstall="C:\Program Files (x86)\Steam\steamapps\common\Valheim"
+   ```
+3. The output DLL will be in `ValheimProxChat/bin/Release/netstandard2.1/`
 
 ## How It Works
 
@@ -132,9 +141,10 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 6. **Playback**: Each remote player gets a dedicated `AudioSource` with a streaming circular buffer
 
 ### Bandwidth Usage
-At default settings (16kHz sample rate, mu-law compression, 100ms transmit interval):
-- ~16 KB/s per speaking player
+At default settings (22050Hz sample rate, mu-law compression, 20ms transmit interval):
+- ~22 KB/s per speaking player
 - Only transmitted while actively speaking (PTT or voice activation)
+- With `LowBandwidthMode = true`: ~8 KB/s per speaker
 
 ## Architecture
 
@@ -158,8 +168,11 @@ ValheimProxChat/
 - **No microphone detected**: Check that your mic is plugged in and set as default in your OS audio settings
 - **Can't hear other players**: Ensure all players have the mod installed and are within `MaxVoiceDistance`
 - **Audio is choppy**: Try increasing `TransmitInterval` or lowering `SampleRate`
-- **Voice too quiet/loud**: Adjust `MicrophoneBoost` (input) and `OutputVolume` (output)
+- **Voice too quiet/loud**: Adjust `MicrophoneBoost` (sender input) and `OutputVolume` (receiver gain). Both are applied to samples, not clamped by Unity.
+- **Too much reverb/echo**: Set `ReverbMix` to `0` (the default). This bypasses Valheim's reverb zones on voice audio.
+- **Audio delay**: Ensure `TransmitInterval` is low (default `0.02`). If you have an old config file, delete it to regenerate with new defaults.
 - **PTT key doesn't work**: Make sure you're not in a menu/console. Check the `PushToTalkKey` config value
+- **High bandwidth usage**: Enable `LowBandwidthMode` in the config for slower connections
 
 ## License
 

@@ -57,20 +57,32 @@ namespace ValheimProxChat
 
         private void SetupFileWatcher()
         {
-            var configFile = Config.ConfigFilePath;
-            var configDir = System.IO.Path.GetDirectoryName(configFile);
-            var configFileName = System.IO.Path.GetFileName(configFile);
-
-            _configWatcher = new System.IO.FileSystemWatcher(configDir, configFileName);
-            _configWatcher.Changed += (sender, args) =>
+            try
             {
-                // Reload on the next frame since file events come from a background thread
-                _pendingConfigReload = true;
-            };
-            _configWatcher.EnableRaisingEvents = true;
-            _configWatcher.NotifyFilter = System.IO.NotifyFilters.LastWrite;
+                var configFile = Config.ConfigFilePath;
+                var configDir = System.IO.Path.GetDirectoryName(configFile);
+                var configFileName = System.IO.Path.GetFileName(configFile);
 
-            Log.LogInfo("Config file watcher active — edit the .cfg file and changes apply live.");
+                if (string.IsNullOrEmpty(configDir) || !System.IO.Directory.Exists(configDir))
+                {
+                    Log.LogWarning("Config directory not found — live config reload disabled.");
+                    return;
+                }
+
+                _configWatcher = new System.IO.FileSystemWatcher(configDir, configFileName);
+                _configWatcher.Changed += (sender, args) =>
+                {
+                    _pendingConfigReload = true;
+                };
+                _configWatcher.EnableRaisingEvents = true;
+                _configWatcher.NotifyFilter = System.IO.NotifyFilters.LastWrite;
+
+                Log.LogInfo("Config file watcher active — edit the .cfg file and changes apply live.");
+            }
+            catch (System.Exception e)
+            {
+                Log.LogWarning($"Could not set up config file watcher: {e.Message}");
+            }
         }
 
         private volatile bool _pendingConfigReload;

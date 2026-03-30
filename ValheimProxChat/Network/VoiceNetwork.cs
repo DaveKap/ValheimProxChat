@@ -60,7 +60,6 @@ namespace ValheimProxChat.Network
             pkg.Write(Player.m_localPlayer.GetPlayerID());
             pkg.Write(Player.m_localPlayer.GetPlayerName());
             pkg.Write(sampleRate);
-            pkg.Write(compressedData.Length);
             pkg.Write(compressedData);
 
             // Write our position so receivers can calculate distance
@@ -83,7 +82,6 @@ namespace ValheimProxChat.Network
                 long playerId = pkg.ReadLong();
                 string playerName = pkg.ReadString();
                 int sampleRate = pkg.ReadInt();
-                int dataLength = pkg.ReadInt();
                 byte[] compressedData = pkg.ReadByteArray();
                 float posX = pkg.ReadSingle();
                 float posY = pkg.ReadSingle();

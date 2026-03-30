@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace ValheimProxChat.Audio
@@ -7,6 +8,10 @@ namespace ValheimProxChat.Audio
     /// Manages per-player AudioSource instances for voice playback.
     /// Each remote player gets a dedicated AudioSource with a streaming AudioClip.
     /// Uses a tight circular buffer with read/write tracking for low-latency playback.
+    ///
+    /// Thread safety: OnAudioRead is called from Unity's audio thread while
+    /// WriteSamplesToBuffer runs on the main thread. SamplesBuffered uses
+    /// Interlocked operations to avoid races.
     /// </summary>
     public class AudioPlaybackManager : MonoBehaviour
     {
@@ -30,13 +35,7 @@ namespace ValheimProxChat.Audio
 
         private const int BufferSizeSeconds = 2;
         private const float CleanupInactiveAfter = 30f;
-
-        // How long after last voice data before we consider someone done speaking.
-        // Keep this generous so short pauses between words don't cause resets.
         private const float SpeakingTimeout = 1.0f;
-
-        // How long after speaking stops (and buffer drains) before we reset the buffer.
-        // This avoids resetting mid-sentence during a brief pause.
         private const float BufferResetTimeout = 2.0f;
 
         public HashSet<long> GetSpeakingPlayers()
@@ -71,11 +70,8 @@ namespace ValheimProxChat.Audio
             pa.AudioObject.transform.position = position;
             pa.Source.volume = volume;
 
-            // Write samples into the circular buffer
             WriteSamplesToBuffer(pa, samples);
 
-            // Start playback immediately on first data — don't wait for a pre-buffer.
-            // A brief underrun is far better than dropping short speech entirely.
             if (!pa.Source.isPlaying)
             {
                 pa.Source.Play();
@@ -131,11 +127,6 @@ namespace ValheimProxChat.Audio
         private void WriteSamplesToBuffer(PlayerAudio pa, float[] samples)
         {
             int bufLen = pa.CircularBuffer.Length;
-
-            // Apply OutputVolume as gain to the sample data.
-            // This is done here (not on AudioSource.volume) because Unity clamps
-            // AudioSource.volume to 0-1, which prevents any amplification above 1x.
-            // Proximity-based attenuation is handled separately via AudioSource.volume.
             float gain = Configuration.OutputVolume.Value;
 
             for (int i = 0; i < samples.Length; i++)
@@ -143,18 +134,25 @@ namespace ValheimProxChat.Audio
                 pa.CircularBuffer[pa.WritePosition] = samples[i] * gain;
                 pa.WritePosition = (pa.WritePosition + 1) % bufLen;
             }
-            pa.SamplesBuffered += samples.Length;
 
+            // Thread-safe increment — OnAudioRead decrements from the audio thread
+            Interlocked.Add(ref pa.SamplesBuffered, samples.Length);
+
+            // Cap to buffer size (not critical to be atomic here, just a ceiling)
             if (pa.SamplesBuffered > bufLen)
                 pa.SamplesBuffered = bufLen;
         }
 
+        /// <summary>
+        /// Called from Unity's audio thread — must be thread-safe.
+        /// </summary>
         private void OnAudioRead(PlayerAudio pa, float[] data)
         {
             int bufLen = pa.CircularBuffer.Length;
             for (int i = 0; i < data.Length; i++)
             {
-                if (pa.SamplesBuffered <= 0)
+                int remaining = Interlocked.CompareExchange(ref pa.SamplesBuffered, 0, 0);
+                if (remaining <= 0)
                 {
                     data[i] = 0f;
                 }
@@ -163,7 +161,7 @@ namespace ValheimProxChat.Audio
                     data[i] = pa.CircularBuffer[pa.ReadPosition];
                     pa.CircularBuffer[pa.ReadPosition] = 0f;
                     pa.ReadPosition = (pa.ReadPosition + 1) % bufLen;
-                    pa.SamplesBuffered--;
+                    Interlocked.Decrement(ref pa.SamplesBuffered);
                 }
             }
         }
@@ -183,16 +181,11 @@ namespace ValheimProxChat.Audio
                 var pa = kvp.Value;
                 float timeSinceLastData = now - pa.LastActiveTime;
 
-                // Mark as not speaking after timeout, but use a generous window
-                // so short pauses between words don't flicker the indicator
                 if (timeSinceLastData > SpeakingTimeout)
                 {
                     pa.IsSpeaking = false;
                 }
 
-                // Only reset the buffer after a longer silence AND the buffer has drained.
-                // This lets short bursts and natural speech pauses play out fully
-                // instead of being cut off.
                 if (timeSinceLastData > BufferResetTimeout && pa.SamplesBuffered <= 0 && pa.Source.isPlaying)
                 {
                     pa.Source.Stop();
