@@ -32,6 +32,10 @@ namespace ValheimProxChat
 
             Configuration.Bind(Config);
 
+            // Enable live config reloading — changes to the .cfg file apply immediately
+            Config.SaveOnConfigSet = true;
+            SetupFileWatcher();
+
             _harmony = new Harmony(PluginGuid);
             _harmony.PatchAll();
 
@@ -49,9 +53,48 @@ namespace ValheimProxChat
             _voiceNetwork.Initialize(_micCapture, _playbackManager);
         }
 
+        private System.IO.FileSystemWatcher _configWatcher;
+
+        private void SetupFileWatcher()
+        {
+            var configFile = Config.ConfigFilePath;
+            var configDir = System.IO.Path.GetDirectoryName(configFile);
+            var configFileName = System.IO.Path.GetFileName(configFile);
+
+            _configWatcher = new System.IO.FileSystemWatcher(configDir, configFileName);
+            _configWatcher.Changed += (sender, args) =>
+            {
+                // Reload on the next frame since file events come from a background thread
+                _pendingConfigReload = true;
+            };
+            _configWatcher.EnableRaisingEvents = true;
+            _configWatcher.NotifyFilter = System.IO.NotifyFilters.LastWrite;
+
+            Log.LogInfo("Config file watcher active — edit the .cfg file and changes apply live.");
+        }
+
+        private volatile bool _pendingConfigReload;
+
+        private void Update()
+        {
+            if (_pendingConfigReload)
+            {
+                _pendingConfigReload = false;
+                Config.Reload();
+                Log.LogInfo("Configuration reloaded from file.");
+            }
+        }
+
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+
+            if (_configWatcher != null)
+            {
+                _configWatcher.EnableRaisingEvents = false;
+                _configWatcher.Dispose();
+                _configWatcher = null;
+            }
         }
 
         /// <summary>
