@@ -38,6 +38,14 @@
            Condition="'$(ValheimInstall)' == ''" />
   </Target>
 
+  <!--
+    Add Managed and BepInEx dirs as assembly search paths so MSBuild can
+    resolve transitive dependencies between Unity DLLs automatically.
+  -->
+  <PropertyGroup>
+    <AssemblySearchPaths>$(AssemblySearchPaths);$(ValheimManaged);$(BepInExDir)</AssemblySearchPaths>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- BepInEx -->
     <Reference Include="BepInEx">
