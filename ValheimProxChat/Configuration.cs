@@ -32,7 +32,7 @@ namespace ValheimProxChat
         {
             // Audio
             MaxVoiceDistance = config.Bind(
-                "Audio", "MaxVoiceDistance", 25f,
+                "Audio", "MaxVoiceDistance", 50f,
                 "Maximum distance (in meters) at which voice can be heard.");
 
             FadeStartDistance = config.Bind(
