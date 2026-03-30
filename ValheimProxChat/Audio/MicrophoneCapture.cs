@@ -45,7 +45,7 @@ namespace ValheimProxChat.Audio
         {
             if (_isRecording) return;
 
-            _sampleRate = Configuration.SampleRate.Value;
+            _sampleRate = Configuration.EffectiveSampleRate;
             _micDevice = string.IsNullOrEmpty(Configuration.MicrophoneDevice.Value)
                 ? null
                 : Configuration.MicrophoneDevice.Value;
@@ -97,7 +97,7 @@ namespace ValheimProxChat.Audio
             if (!Plugin.IsVoiceChatActive()) return;
 
             _transmitTimer += Time.unscaledDeltaTime;
-            if (_transmitTimer < Configuration.TransmitInterval.Value) return;
+            if (_transmitTimer < Configuration.EffectiveTransmitInterval) return;
             _transmitTimer = 0f;
 
             // Read available samples from the microphone

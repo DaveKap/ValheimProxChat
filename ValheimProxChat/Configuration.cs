@@ -22,6 +22,7 @@ namespace ValheimProxChat
 
         // Network settings
         public static ConfigEntry<float> TransmitInterval;
+        public static ConfigEntry<bool> LowBandwidthMode;
 
         // UI settings
         public static ConfigEntry<bool> ShowSpeakingIndicator;
@@ -39,16 +40,16 @@ namespace ValheimProxChat
                 "Distance at which voice volume starts to fade out.");
 
             MicrophoneBoost = config.Bind(
-                "Audio", "MicrophoneBoost", 1.0f,
-                "Multiplier for microphone input volume (1.0 = normal).");
+                "Audio", "MicrophoneBoost", 1.5f,
+                "Multiplier for microphone input volume (1.0 = normal, 1.5 = default boost).");
 
             OutputVolume = config.Bind(
-                "Audio", "OutputVolume", 1.0f,
-                "Master volume for received voice audio (0.0 to 2.0).");
+                "Audio", "OutputVolume", 2.0f,
+                "Master volume for received voice audio (0.0 to 3.0). Default 2.0 compensates for compression.");
 
             SampleRate = config.Bind(
-                "Audio", "SampleRate", 16000,
-                "Audio sample rate in Hz. Lower = less bandwidth, lower quality. Recommended: 8000, 16000, or 22050.");
+                "Audio", "SampleRate", 22050,
+                "Audio sample rate in Hz. Higher = better quality but more bandwidth. Recommended: 8000, 16000, or 22050.");
 
             MicrophoneDevice = config.Bind(
                 "Audio", "MicrophoneDevice", "",
@@ -77,8 +78,12 @@ namespace ValheimProxChat
 
             // Network
             TransmitInterval = config.Bind(
-                "Network", "TransmitInterval", 0.1f,
-                "How often (in seconds) voice data packets are sent. Lower = smoother but more bandwidth.");
+                "Network", "TransmitInterval", 0.04f,
+                "How often (in seconds) voice data packets are sent. Default 0.04 (40ms) for low latency. Increase to 0.1 for slower connections.");
+
+            LowBandwidthMode = config.Bind(
+                "Network", "LowBandwidthMode", false,
+                "Enable for slower or overseas connections. Reduces sample rate to 8000Hz and transmit interval to 100ms (~8 KB/s per speaker instead of ~22 KB/s).");
 
             // UI
             ShowSpeakingIndicator = config.Bind(
@@ -88,6 +93,22 @@ namespace ValheimProxChat
             ShowVoiceRange = config.Bind(
                 "UI", "ShowVoiceRange", false,
                 "Show a debug circle indicating your voice range.");
+        }
+
+        /// <summary>
+        /// Returns the effective sample rate, accounting for LowBandwidthMode.
+        /// </summary>
+        public static int EffectiveSampleRate
+        {
+            get { return LowBandwidthMode.Value ? 8000 : SampleRate.Value; }
+        }
+
+        /// <summary>
+        /// Returns the effective transmit interval, accounting for LowBandwidthMode.
+        /// </summary>
+        public static float EffectiveTransmitInterval
+        {
+            get { return LowBandwidthMode.Value ? 0.1f : TransmitInterval.Value; }
         }
     }
 }

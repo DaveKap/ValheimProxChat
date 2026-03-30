@@ -6,12 +6,10 @@ namespace ValheimProxChat.Audio
     /// <summary>
     /// Manages per-player AudioSource instances for voice playback.
     /// Each remote player gets a dedicated AudioSource with a streaming AudioClip.
+    /// Uses a tight circular buffer with read/write tracking for low-latency playback.
     /// </summary>
     public class AudioPlaybackManager : MonoBehaviour
     {
-        /// <summary>
-        /// Tracks playback state for a single remote player.
-        /// </summary>
         private class PlayerAudio
         {
             public long PlayerId;
@@ -25,15 +23,20 @@ namespace ValheimProxChat.Audio
             public float LastActiveTime;
             public bool IsSpeaking;
             public Vector3 LastPosition;
+            public bool HasStartedPlaying;
+            public int SamplesBuffered;
         }
 
         private readonly Dictionary<long, PlayerAudio> _playerAudios = new Dictionary<long, PlayerAudio>();
-        private const int BufferSizeSeconds = 5;
+
+        // Keep buffer small for low latency — 2 seconds is plenty
+        private const int BufferSizeSeconds = 2;
         private const float CleanupInactiveAfter = 30f;
 
-        /// <summary>
-        /// Returns the set of player IDs currently speaking.
-        /// </summary>
+        // Minimum samples to buffer before starting playback (~60ms at any sample rate)
+        // This prevents starting playback before enough data exists to avoid immediate underrun
+        private const float MinBufferBeforePlaySeconds = 0.06f;
+
         public HashSet<long> GetSpeakingPlayers()
         {
             var speaking = new HashSet<long>();
@@ -45,17 +48,11 @@ namespace ValheimProxChat.Audio
             return speaking;
         }
 
-        /// <summary>
-        /// Get the player name for a given player ID, if known.
-        /// </summary>
         public string GetPlayerName(long playerId)
         {
             return _playerAudios.TryGetValue(playerId, out var pa) ? pa.PlayerName : null;
         }
 
-        /// <summary>
-        /// Play a chunk of voice audio from a remote player.
-        /// </summary>
         public void PlayVoiceChunk(long playerId, string playerName, Vector3 position, float[] samples, int sampleRate, float volume)
         {
             if (!_playerAudios.TryGetValue(playerId, out PlayerAudio pa))
@@ -69,17 +66,21 @@ namespace ValheimProxChat.Audio
             pa.IsSpeaking = true;
             pa.LastPosition = position;
 
-            // Update audio source position and volume
             pa.AudioObject.transform.position = position;
             pa.Source.volume = volume;
 
             // Write samples into the circular buffer
             WriteSamplesToBuffer(pa, samples);
 
-            // Ensure the source is playing
-            if (!pa.Source.isPlaying)
+            // Start playback once we've buffered enough to avoid underruns
+            if (!pa.HasStartedPlaying)
             {
-                pa.Source.Play();
+                int minSamples = (int)(sampleRate * MinBufferBeforePlaySeconds);
+                if (pa.SamplesBuffered >= minSamples)
+                {
+                    pa.Source.Play();
+                    pa.HasStartedPlaying = true;
+                }
             }
         }
 
@@ -89,11 +90,11 @@ namespace ValheimProxChat.Audio
             go.transform.SetParent(transform);
 
             var source = go.AddComponent<AudioSource>();
-            source.spatialBlend = 0f; // 2D audio - we handle distance attenuation manually
+            source.spatialBlend = 0f;
             source.loop = true;
             source.playOnAwake = false;
-            source.priority = 0; // Highest priority for voice
-            source.reverbZoneMix = Configuration.ReverbMix.Value; // Default 0 = no reverb
+            source.priority = 0;
+            source.reverbZoneMix = Configuration.ReverbMix.Value;
             source.bypassReverbZones = Configuration.ReverbMix.Value <= 0.01f;
             source.bypassEffects = Configuration.ReverbMix.Value <= 0.01f;
             source.bypassListenerEffects = Configuration.ReverbMix.Value <= 0.01f;
@@ -112,16 +113,17 @@ namespace ValheimProxChat.Audio
                 SampleRate = sampleRate,
                 LastActiveTime = Time.unscaledTime,
                 IsSpeaking = false,
-                LastPosition = Vector3.zero
+                LastPosition = Vector3.zero,
+                HasStartedPlaying = false,
+                SamplesBuffered = 0
             };
 
-            // Create a streaming AudioClip that reads from our circular buffer
             source.clip = AudioClip.Create(
                 $"voice_{playerId}",
                 bufferSize,
-                1, // Mono
+                1,
                 sampleRate,
-                true, // Stream
+                true,
                 (data) => OnAudioRead(pa, data),
                 (newPosition) => OnAudioSetPosition(pa, newPosition)
             );
@@ -137,6 +139,11 @@ namespace ValheimProxChat.Audio
                 pa.CircularBuffer[pa.WritePosition] = samples[i];
                 pa.WritePosition = (pa.WritePosition + 1) % bufLen;
             }
+            pa.SamplesBuffered += samples.Length;
+
+            // Cap tracked buffered amount to buffer size
+            if (pa.SamplesBuffered > bufLen)
+                pa.SamplesBuffered = bufLen;
         }
 
         private void OnAudioRead(PlayerAudio pa, float[] data)
@@ -144,16 +151,17 @@ namespace ValheimProxChat.Audio
             int bufLen = pa.CircularBuffer.Length;
             for (int i = 0; i < data.Length; i++)
             {
-                // If read has caught up to write, output silence
-                if (pa.ReadPosition == pa.WritePosition)
+                if (pa.SamplesBuffered <= 0)
                 {
+                    // Underrun: output silence
                     data[i] = 0f;
                 }
                 else
                 {
                     data[i] = pa.CircularBuffer[pa.ReadPosition];
-                    pa.CircularBuffer[pa.ReadPosition] = 0f; // Clear after reading
+                    pa.CircularBuffer[pa.ReadPosition] = 0f;
                     pa.ReadPosition = (pa.ReadPosition + 1) % bufLen;
+                    pa.SamplesBuffered--;
                 }
             }
         }
@@ -173,12 +181,21 @@ namespace ValheimProxChat.Audio
                 var pa = kvp.Value;
 
                 // Mark as not speaking if no data received recently
-                if (now - pa.LastActiveTime > 0.5f)
+                if (now - pa.LastActiveTime > 0.3f)
                 {
                     pa.IsSpeaking = false;
                 }
 
-                // Clean up inactive player audio objects
+                // If stopped speaking, stop the source and reset so next speech starts fresh
+                if (!pa.IsSpeaking && pa.HasStartedPlaying && pa.SamplesBuffered <= 0)
+                {
+                    pa.Source.Stop();
+                    pa.HasStartedPlaying = false;
+                    pa.WritePosition = 0;
+                    pa.ReadPosition = 0;
+                }
+
+                // Clean up long-inactive player audio objects
                 if (now - pa.LastActiveTime > CleanupInactiveAfter)
                 {
                     toRemove.Add(kvp.Key);
