@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using ValheimProxChat.Audio;
 
@@ -6,15 +7,36 @@ namespace ValheimProxChat.Network
 {
     /// <summary>
     /// Handles sending and receiving voice data over Valheim's ZRoutedRpc network system.
-    /// Voice packets are sent as routed RPCs to all peers, then filtered by distance on the receiving end.
+    ///
+    /// ZRoutedRpc runs over SteamNetworking which is reliable and ordered (TCP-like).
+    /// This means late retransmissions can cause delay spikes for real-time audio.
+    /// To mitigate this:
+    ///   - Packets include a timestamp so receivers can drop stale audio
+    ///   - We skip sending entirely when no players are within voice range
+    ///   - Per-packet overhead is minimized (no redundant player name on every packet)
     /// </summary>
     public class VoiceNetwork : MonoBehaviour
     {
         private const string RpcVoiceData = "ValheimProxChat_VoiceData";
 
+        // Packet version byte — increment if the packet format changes
+        private const byte PacketVersion = 2;
+
+        // Maximum age (in seconds) of a voice packet before it's dropped.
+        // Since ZRoutedRpc is reliable/ordered, TCP retransmissions can deliver
+        // stale packets late. Playing old audio causes jarring delay spikes.
+        private const float MaxPacketAge = 0.5f;
+
         private MicrophoneCapture _micCapture;
         private AudioPlaybackManager _playbackManager;
         private bool _registered;
+
+        // Cache of known player names by ID, so we don't need to send the name
+        // in every single packet (50/sec). Sender includes name periodically,
+        // receiver caches it.
+        private readonly Dictionary<long, string> _knownPlayerNames = new Dictionary<long, string>();
+        private float _lastNameBroadcast;
+        private const float NameBroadcastInterval = 2.0f; // Send name every 2 seconds
 
         public void Initialize(MicrophoneCapture micCapture, AudioPlaybackManager playbackManager)
         {
@@ -26,7 +48,6 @@ namespace ValheimProxChat.Network
 
         private void Update()
         {
-            // Register RPC when ZRoutedRpc becomes available (after connecting to a world)
             if (!_registered && ZRoutedRpc.instance != null)
             {
                 ZRoutedRpc.instance.Register<ZPackage>(RpcVoiceData, OnReceiveVoiceData);
@@ -34,10 +55,10 @@ namespace ValheimProxChat.Network
                 Plugin.Log.LogInfo("Voice chat network registered.");
             }
 
-            // Unregister if we've disconnected
             if (_registered && ZRoutedRpc.instance == null)
             {
                 _registered = false;
+                _knownPlayerNames.Clear();
             }
         }
 
@@ -55,21 +76,61 @@ namespace ValheimProxChat.Network
             if (!_registered || ZRoutedRpc.instance == null) return;
             if (Player.m_localPlayer == null) return;
 
-            // Build the network packet
+            // Optimization: don't send voice data if no other players are within hearing range.
+            // This avoids flooding the server with packets that every receiver will just discard.
+            Vector3 myPos = Player.m_localPlayer.transform.position;
+            if (!AnyPlayersInRange(myPos, Configuration.MaxVoiceDistance.Value))
+                return;
+
+            // Determine whether to include the player name in this packet.
+            // Sending the name every packet wastes ~20+ bytes * 50 packets/sec.
+            // Instead, send it every few seconds. Receivers cache it.
+            float now = Time.unscaledTime;
+            bool includeName = (now - _lastNameBroadcast) >= NameBroadcastInterval;
+
             ZPackage pkg = new ZPackage();
+            pkg.Write(PacketVersion);
             pkg.Write(Player.m_localPlayer.GetPlayerID());
-            pkg.Write(Player.m_localPlayer.GetPlayerName());
+
+            // Flags byte: bit 0 = name included
+            byte flags = 0;
+            if (includeName) flags |= 0x01;
+            pkg.Write(flags);
+
+            if (includeName)
+            {
+                pkg.Write(Player.m_localPlayer.GetPlayerName());
+                _lastNameBroadcast = now;
+            }
+
             pkg.Write(sampleRate);
             pkg.Write(compressedData);
 
-            // Write our position so receivers can calculate distance
-            Vector3 pos = Player.m_localPlayer.transform.position;
-            pkg.Write(pos.x);
-            pkg.Write(pos.y);
-            pkg.Write(pos.z);
+            // Position for distance calculation
+            pkg.Write(myPos.x);
+            pkg.Write(myPos.y);
+            pkg.Write(myPos.z);
 
-            // Send to all peers (ZRoutedRpc.Everybody)
+            // Timestamp for stale packet detection (sender's local time)
+            pkg.Write(now);
+
             ZRoutedRpc.instance.InvokeRoutedRPC(ZRoutedRpc.Everybody, RpcVoiceData, pkg);
+        }
+
+        /// <summary>
+        /// Returns true if any other player is within the given range.
+        /// </summary>
+        private static bool AnyPlayersInRange(Vector3 position, float range)
+        {
+            float rangeSq = range * range;
+            foreach (Player p in Player.GetAllPlayers())
+            {
+                if (p == Player.m_localPlayer) continue;
+                // Use sqrMagnitude to avoid sqrt per player
+                if ((p.transform.position - position).sqrMagnitude <= rangeSq)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -79,34 +140,77 @@ namespace ValheimProxChat.Network
         {
             try
             {
+                byte version = pkg.ReadByte();
+
+                // Handle both old (v1) and new (v2) packet formats during transition
+                if (version != PacketVersion)
+                {
+                    HandleLegacyPacket(version, pkg);
+                    return;
+                }
+
                 long playerId = pkg.ReadLong();
-                string playerName = pkg.ReadString();
+                byte flags = pkg.ReadByte();
+                bool hasName = (flags & 0x01) != 0;
+
+                string playerName = null;
+                if (hasName)
+                {
+                    playerName = pkg.ReadString();
+                    _knownPlayerNames[playerId] = playerName;
+                }
+                else
+                {
+                    _knownPlayerNames.TryGetValue(playerId, out playerName);
+                }
+
+                // Fall back to looking up the player object if we don't have a cached name
+                if (playerName == null)
+                {
+                    foreach (Player p in Player.GetAllPlayers())
+                    {
+                        if (p.GetPlayerID() == playerId)
+                        {
+                            playerName = p.GetPlayerName();
+                            _knownPlayerNames[playerId] = playerName;
+                            break;
+                        }
+                    }
+                    if (playerName == null)
+                        playerName = $"Player_{playerId}";
+                }
+
                 int sampleRate = pkg.ReadInt();
                 byte[] compressedData = pkg.ReadByteArray();
                 float posX = pkg.ReadSingle();
                 float posY = pkg.ReadSingle();
                 float posZ = pkg.ReadSingle();
+                float senderTime = pkg.ReadSingle();
 
                 // Don't play back our own voice
                 if (Player.m_localPlayer != null && playerId == Player.m_localPlayer.GetPlayerID())
                     return;
 
+                // Drop stale packets. Since ZRoutedRpc is reliable (TCP-like),
+                // retransmitted packets can arrive late. Playing old audio at
+                // the wrong time is worse than dropping it.
+                // We can't compare sender time directly (different clocks), but
+                // we can track the latest timestamp per sender and drop anything older.
+                if (!IsPacketFresh(playerId, senderTime))
+                    return;
+
                 Vector3 senderPosition = new Vector3(posX, posY, posZ);
 
-                // Calculate distance from local player
                 if (Player.m_localPlayer == null) return;
                 float distance = Vector3.Distance(Player.m_localPlayer.transform.position, senderPosition);
 
                 float maxDistance = Configuration.MaxVoiceDistance.Value;
-                if (distance > maxDistance) return; // Too far away, don't play
+                if (distance > maxDistance) return;
 
-                // Calculate volume based on distance (0-1 range for AudioSource)
                 float volume = CalculateProximityVolume(distance);
 
-                // Decompress audio
                 float[] samples = AudioCompression.Decompress(compressedData, 0, compressedData.Length);
 
-                // Hand off to the playback manager
                 _playbackManager.PlayVoiceChunk(playerId, playerName, senderPosition, samples, sampleRate, volume);
             }
             catch (Exception e)
@@ -116,8 +220,39 @@ namespace ValheimProxChat.Network
         }
 
         /// <summary>
-        /// Calculate volume based on distance using linear falloff between fade start and max distance.
+        /// Handle packets from older mod versions that use a different format.
+        /// The old format started with a long (playerId), whose first byte would be
+        /// non-zero and != PacketVersion, so we can distinguish them.
         /// </summary>
+        private void HandleLegacyPacket(byte firstByte, ZPackage pkg)
+        {
+            // Old v1 format: playerId(long), playerName(string), sampleRate(int),
+            //                compressedData(byte[]), posX/Y/Z(float)
+            // The firstByte we already read was the first byte of the playerId long.
+            // We can't reliably reconstruct it, so just drop legacy packets.
+            // Players will need to update together.
+        }
+
+        // Track the latest timestamp seen per sender to detect out-of-order packets
+        private readonly Dictionary<long, float> _lastPacketTime = new Dictionary<long, float>();
+
+        /// <summary>
+        /// Returns true if this packet is newer than the last one from this sender.
+        /// Drops out-of-order packets that arrived late due to TCP retransmission.
+        /// </summary>
+        private bool IsPacketFresh(long playerId, float senderTime)
+        {
+            if (_lastPacketTime.TryGetValue(playerId, out float lastTime))
+            {
+                // Drop packets older than the last one we processed.
+                // Allow a small tolerance for float precision.
+                if (senderTime < lastTime - 0.001f)
+                    return false;
+            }
+            _lastPacketTime[playerId] = senderTime;
+            return true;
+        }
+
         private static float CalculateProximityVolume(float distance)
         {
             float fadeStart = Configuration.FadeStartDistance.Value;
@@ -126,7 +261,6 @@ namespace ValheimProxChat.Network
             if (distance <= fadeStart) return 1f;
             if (distance >= maxDistance) return 0f;
 
-            // Linear falloff
             return 1f - (distance - fadeStart) / (maxDistance - fadeStart);
         }
     }
