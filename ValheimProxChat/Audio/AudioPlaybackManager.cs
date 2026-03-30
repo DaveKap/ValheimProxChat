@@ -23,19 +23,21 @@ namespace ValheimProxChat.Audio
             public float LastActiveTime;
             public bool IsSpeaking;
             public Vector3 LastPosition;
-            public bool HasStartedPlaying;
             public int SamplesBuffered;
         }
 
         private readonly Dictionary<long, PlayerAudio> _playerAudios = new Dictionary<long, PlayerAudio>();
 
-        // Keep buffer small for low latency — 2 seconds is plenty
         private const int BufferSizeSeconds = 2;
         private const float CleanupInactiveAfter = 30f;
 
-        // Minimum samples to buffer before starting playback (~60ms at any sample rate)
-        // This prevents starting playback before enough data exists to avoid immediate underrun
-        private const float MinBufferBeforePlaySeconds = 0.06f;
+        // How long after last voice data before we consider someone done speaking.
+        // Keep this generous so short pauses between words don't cause resets.
+        private const float SpeakingTimeout = 1.0f;
+
+        // How long after speaking stops (and buffer drains) before we reset the buffer.
+        // This avoids resetting mid-sentence during a brief pause.
+        private const float BufferResetTimeout = 2.0f;
 
         public HashSet<long> GetSpeakingPlayers()
         {
@@ -72,15 +74,11 @@ namespace ValheimProxChat.Audio
             // Write samples into the circular buffer
             WriteSamplesToBuffer(pa, samples);
 
-            // Start playback once we've buffered enough to avoid underruns
-            if (!pa.HasStartedPlaying)
+            // Start playback immediately on first data — don't wait for a pre-buffer.
+            // A brief underrun is far better than dropping short speech entirely.
+            if (!pa.Source.isPlaying)
             {
-                int minSamples = (int)(sampleRate * MinBufferBeforePlaySeconds);
-                if (pa.SamplesBuffered >= minSamples)
-                {
-                    pa.Source.Play();
-                    pa.HasStartedPlaying = true;
-                }
+                pa.Source.Play();
             }
         }
 
@@ -114,7 +112,6 @@ namespace ValheimProxChat.Audio
                 LastActiveTime = Time.unscaledTime,
                 IsSpeaking = false,
                 LastPosition = Vector3.zero,
-                HasStartedPlaying = false,
                 SamplesBuffered = 0
             };
 
@@ -141,7 +138,6 @@ namespace ValheimProxChat.Audio
             }
             pa.SamplesBuffered += samples.Length;
 
-            // Cap tracked buffered amount to buffer size
             if (pa.SamplesBuffered > bufLen)
                 pa.SamplesBuffered = bufLen;
         }
@@ -153,7 +149,6 @@ namespace ValheimProxChat.Audio
             {
                 if (pa.SamplesBuffered <= 0)
                 {
-                    // Underrun: output silence
                     data[i] = 0f;
                 }
                 else
@@ -179,24 +174,26 @@ namespace ValheimProxChat.Audio
             foreach (var kvp in _playerAudios)
             {
                 var pa = kvp.Value;
+                float timeSinceLastData = now - pa.LastActiveTime;
 
-                // Mark as not speaking if no data received recently
-                if (now - pa.LastActiveTime > 0.3f)
+                // Mark as not speaking after timeout, but use a generous window
+                // so short pauses between words don't flicker the indicator
+                if (timeSinceLastData > SpeakingTimeout)
                 {
                     pa.IsSpeaking = false;
                 }
 
-                // If stopped speaking, stop the source and reset so next speech starts fresh
-                if (!pa.IsSpeaking && pa.HasStartedPlaying && pa.SamplesBuffered <= 0)
+                // Only reset the buffer after a longer silence AND the buffer has drained.
+                // This lets short bursts and natural speech pauses play out fully
+                // instead of being cut off.
+                if (timeSinceLastData > BufferResetTimeout && pa.SamplesBuffered <= 0 && pa.Source.isPlaying)
                 {
                     pa.Source.Stop();
-                    pa.HasStartedPlaying = false;
                     pa.WritePosition = 0;
                     pa.ReadPosition = 0;
                 }
 
-                // Clean up long-inactive player audio objects
-                if (now - pa.LastActiveTime > CleanupInactiveAfter)
+                if (timeSinceLastData > CleanupInactiveAfter)
                 {
                     toRemove.Add(kvp.Key);
                 }

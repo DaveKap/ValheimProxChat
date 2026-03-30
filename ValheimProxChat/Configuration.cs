@@ -78,8 +78,8 @@ namespace ValheimProxChat
 
             // Network
             TransmitInterval = config.Bind(
-                "Network", "TransmitInterval", 0.04f,
-                "How often (in seconds) voice data packets are sent. Default 0.04 (40ms) for low latency. Increase to 0.1 for slower connections.");
+                "Network", "TransmitInterval", 0.02f,
+                "How often (in seconds) voice data packets are sent. Default 0.02 (20ms) for low latency. Increase to 0.1 for slower connections.");
 
             LowBandwidthMode = config.Bind(
                 "Network", "LowBandwidthMode", false,
