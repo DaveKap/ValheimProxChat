@@ -84,7 +84,17 @@ namespace ValheimProxChat.Audio
             go.transform.SetParent(transform);
 
             var source = go.AddComponent<AudioSource>();
-            source.spatialBlend = 0f;
+            source.spatialBlend = 1.0f; // Fully 3D — Unity handles directional panning
+            source.rolloffMode = AudioRolloffMode.Custom;
+            // Flat rolloff curve: Unity won't attenuate by distance (we do it ourselves
+            // via OutputVolume gain in WriteSamplesToBuffer). This lets Unity handle only
+            // the directional stereo panning based on the AudioSource's world position.
+            source.SetCustomCurve(AudioSourceCurveType.CustomRolloff,
+                AnimationCurve.Linear(0f, 1f, 1f, 1f));
+            source.minDistance = 0f;
+            source.maxDistance = 500f;
+            source.spread = 60f; // Stereo spread angle in degrees
+            source.dopplerLevel = 0f; // Disable doppler for voice
             source.loop = true;
             source.playOnAwake = false;
             source.priority = 0;
