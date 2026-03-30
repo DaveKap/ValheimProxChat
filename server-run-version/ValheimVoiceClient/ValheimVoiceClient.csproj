@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>ValheimVoiceClient</AssemblyName>
+    <RootNamespace>ValheimVoiceClient</RootNamespace>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <Import Project="Environment.props" Condition="Exists('Environment.props')" />
+
+  <PropertyGroup>
+    <ValheimInstall Condition="'$(ValheimInstall)' == ''">$(VALHEIM_INSTALL)</ValheimInstall>
+    <ValheimManaged>$(ValheimInstall)\valheim_Data\Managed</ValheimManaged>
+    <BepInExDir>$(ValheimInstall)\BepInEx\core</BepInExDir>
+  </PropertyGroup>
+
+  <Target Name="CheckValheimInstall" BeforeTargets="ResolveAssemblyReferences">
+    <Error Text="VALHEIM_INSTALL is not set. Set the environment variable or create Environment.props."
+           Condition="'$(ValheimInstall)' == ''" />
+  </Target>
+
+  <PropertyGroup>
+    <AssemblySearchPaths>$(AssemblySearchPaths);$(ValheimManaged);$(BepInExDir)</AssemblySearchPaths>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExDir)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExDir)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(ValheimManaged)\UnityEngine.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.UI.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\assembly_valheim.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\assembly_guiutils.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\assembly_utils.dll" Private="false" />
+  </ItemGroup>
+
+</Project>

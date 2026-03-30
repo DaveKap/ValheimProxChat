@@ -1,0 +1,25 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ValheimVoiceServer", "ValheimVoiceServer\ValheimVoiceServer.csproj", "{B1C2D3E4-F5A6-7890-BCDE-F12345678901}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ValheimVoiceClient", "ValheimVoiceClient\ValheimVoiceClient.csproj", "{C2D3E4F5-A6B7-8901-CDEF-123456789012}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|AnyCPU = Debug|AnyCPU
+		Release|AnyCPU = Release|AnyCPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B1C2D3E4-F5A6-7890-BCDE-F12345678901}.Debug|AnyCPU.ActiveCfg = Debug|AnyCPU
+		{B1C2D3E4-F5A6-7890-BCDE-F12345678901}.Debug|AnyCPU.Build.0 = Debug|AnyCPU
+		{B1C2D3E4-F5A6-7890-BCDE-F12345678901}.Release|AnyCPU.ActiveCfg = Release|AnyCPU
+		{B1C2D3E4-F5A6-7890-BCDE-F12345678901}.Release|AnyCPU.Build.0 = Release|AnyCPU
+		{C2D3E4F5-A6B7-8901-CDEF-123456789012}.Debug|AnyCPU.ActiveCfg = Debug|AnyCPU
+		{C2D3E4F5-A6B7-8901-CDEF-123456789012}.Debug|AnyCPU.Build.0 = Debug|AnyCPU
+		{C2D3E4F5-A6B7-8901-CDEF-123456789012}.Release|AnyCPU.ActiveCfg = Release|AnyCPU
+		{C2D3E4F5-A6B7-8901-CDEF-123456789012}.Release|AnyCPU.Build.0 = Release|AnyCPU
+	EndGlobalSection
+EndGlobal
