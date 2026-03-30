@@ -57,41 +57,23 @@
       <Private>false</Private>
     </Reference>
 
-    <!-- Unity Engine (from valheim_Data\Managed) -->
-    <Reference Include="UnityEngine">
-      <HintPath>$(ValheimManaged)\UnityEngine.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(ValheimManaged)\UnityEngine.CoreModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.AudioModule">
-      <HintPath>$(ValheimManaged)\UnityEngine.AudioModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>$(ValheimManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>$(ValheimManaged)\UnityEngine.IMGUIModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.UI">
-      <HintPath>$(ValheimManaged)\UnityEngine.UI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <!-- Unity Engine — reference all modules to avoid transitive dependency errors -->
+    <Reference Include="$(ValheimManaged)\UnityEngine.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.Physics2DModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\UnityEngine.UI.dll" Private="false" />
 
     <!-- Valheim -->
-    <Reference Include="assembly_valheim">
-      <HintPath>$(ValheimManaged)\assembly_valheim.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="assembly_guiutils">
-      <HintPath>$(ValheimManaged)\assembly_guiutils.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <Reference Include="$(ValheimManaged)\assembly_valheim.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\assembly_guiutils.dll" Private="false" />
+    <Reference Include="$(ValheimManaged)\assembly_utils.dll" Private="false" />
   </ItemGroup>
 
 </Project>
