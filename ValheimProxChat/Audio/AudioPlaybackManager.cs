@@ -93,6 +93,10 @@ namespace ValheimProxChat.Audio
             source.loop = true;
             source.playOnAwake = false;
             source.priority = 0; // Highest priority for voice
+            source.reverbZoneMix = Configuration.ReverbMix.Value; // Default 0 = no reverb
+            source.bypassReverbZones = Configuration.ReverbMix.Value <= 0.01f;
+            source.bypassEffects = Configuration.ReverbMix.Value <= 0.01f;
+            source.bypassListenerEffects = Configuration.ReverbMix.Value <= 0.01f;
 
             int bufferSize = sampleRate * BufferSizeSeconds;
 

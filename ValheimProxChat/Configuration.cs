@@ -14,6 +14,7 @@ namespace ValheimProxChat
         public static ConfigEntry<float> OutputVolume;
         public static ConfigEntry<int> SampleRate;
         public static ConfigEntry<string> MicrophoneDevice;
+        public static ConfigEntry<float> ReverbMix;
         public static ConfigEntry<bool> PushToTalk;
         public static ConfigEntry<string> PushToTalkKey;
         public static ConfigEntry<bool> VoiceActivation;
@@ -52,6 +53,10 @@ namespace ValheimProxChat
             MicrophoneDevice = config.Bind(
                 "Audio", "MicrophoneDevice", "",
                 "Microphone device name. Leave empty to use the default device.");
+
+            ReverbMix = config.Bind(
+                "Audio", "ReverbMix", 0.0f,
+                "How much of Valheim's reverb zones affect voice audio (0.0 = no reverb, 1.0 = full reverb). Default is 0 for clean voice.");
 
             // Input
             PushToTalk = config.Bind(
