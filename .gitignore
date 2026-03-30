@@ -25,5 +25,8 @@ Thumbs.db
 *.dll
 !lib/*.dll
 
+# User-local build config
+Environment.props
+
 # Thunderstore package
 thunderstore/*.zip
