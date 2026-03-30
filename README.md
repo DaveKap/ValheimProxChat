@@ -72,8 +72,8 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 ## Building from Source
 
 ### Prerequisites
-- .NET SDK 6.0+ (for building netstandard2.1)
-- Valheim installed with BepInEx 5
+- .NET SDK 6.0+ (or Visual Studio / Rider with .NET Framework 4.6.2 targeting pack)
+- Valheim installed with BepInEx 5 (Denikson pack)
 
 ### Build Steps
 
@@ -90,7 +90,7 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
    ```bash
    dotnet build ValheimProxChat/ValheimProxChat.csproj -c Release
    ```
-4. The output DLL will be in `ValheimProxChat/bin/Release/netstandard2.1/`
+4. The output DLL will be in `ValheimProxChat/bin/Release/net462/`
 
 ## How It Works
 
