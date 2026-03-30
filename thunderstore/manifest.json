@@ -1,0 +1,9 @@
+{
+    "name": "ValheimProxChat",
+    "version_number": "1.0.0",
+    "website_url": "https://github.com/davekap/valheimproxchat",
+    "description": "Adds proximity-based voice chat to Valheim. Talk to nearby players using your microphone with distance-based volume falloff.",
+    "dependencies": [
+        "denikson-BepInExPack_Valheim-5.4.2202"
+    ]
+}

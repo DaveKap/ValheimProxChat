@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>ValheimProxChat</AssemblyName>
+    <RootNamespace>ValheimProxChat</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>ValheimProxChat Contributors</Authors>
+    <Description>Proximity voice chat mod for Valheim</Description>
+  </PropertyGroup>
+
+  <!--
+    Valheim modding references.
+    Set the environment variable VALHEIM_INSTALL to your Valheim installation directory,
+    or edit the paths below to match your setup.
+
+    Required assemblies come from:
+      - BepInEx 5 (Denikson pack for Valheim)
+      - Valheim managed DLLs (valheim_Data/Managed/)
+      - Unity engine DLLs (valheim_Data/Managed/)
+
+    Example VALHEIM_INSTALL: C:\Program Files (x86)\Steam\steamapps\common\Valheim
+  -->
+
+  <PropertyGroup>
+    <ValheimInstall Condition="'$(VALHEIM_INSTALL)' != ''">$(VALHEIM_INSTALL)</ValheimInstall>
+    <ValheimInstall Condition="'$(ValheimInstall)' == ''">$(HOME)/.steam/steam/steamapps/common/Valheim</ValheimInstall>
+    <ValheimManaged>$(ValheimInstall)/valheim_Data/Managed</ValheimManaged>
+    <BepInExDir>$(ValheimInstall)/BepInEx/core</BepInExDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BepInEx -->
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExDir)/BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Unity Engine -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(ValheimManaged)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ValheimManaged)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(ValheimManaged)/UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(ValheimManaged)/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ValheimManaged)/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Valheim -->
+    <Reference Include="assembly_valheim">
+      <HintPath>$(ValheimManaged)/assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_guiutils">
+      <HintPath>$(ValheimManaged)/assembly_guiutils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
