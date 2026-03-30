@@ -131,9 +131,16 @@ namespace ValheimProxChat.Audio
         private void WriteSamplesToBuffer(PlayerAudio pa, float[] samples)
         {
             int bufLen = pa.CircularBuffer.Length;
+
+            // Apply OutputVolume as gain to the sample data.
+            // This is done here (not on AudioSource.volume) because Unity clamps
+            // AudioSource.volume to 0-1, which prevents any amplification above 1x.
+            // Proximity-based attenuation is handled separately via AudioSource.volume.
+            float gain = Configuration.OutputVolume.Value;
+
             for (int i = 0; i < samples.Length; i++)
             {
-                pa.CircularBuffer[pa.WritePosition] = samples[i];
+                pa.CircularBuffer[pa.WritePosition] = samples[i] * gain;
                 pa.WritePosition = (pa.WritePosition + 1) % bufLen;
             }
             pa.SamplesBuffered += samples.Length;

@@ -102,9 +102,8 @@ namespace ValheimProxChat.Network
                 float maxDistance = Configuration.MaxVoiceDistance.Value;
                 if (distance > maxDistance) return; // Too far away, don't play
 
-                // Calculate volume based on distance
+                // Calculate volume based on distance (0-1 range for AudioSource)
                 float volume = CalculateProximityVolume(distance);
-                volume *= Configuration.OutputVolume.Value;
 
                 // Decompress audio
                 float[] samples = AudioCompression.Decompress(compressedData, 0, compressedData.Length);
