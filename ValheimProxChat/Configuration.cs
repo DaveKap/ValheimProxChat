@@ -48,8 +48,8 @@ namespace ValheimProxChat
                 "Master volume for received voice audio (0.0 to 3.0). Default 2.0 compensates for compression.");
 
             SampleRate = config.Bind(
-                "Audio", "SampleRate", 22050,
-                "Audio sample rate in Hz. Higher = better quality but more bandwidth. Recommended: 8000, 16000, or 22050.");
+                "Audio", "SampleRate", 16000,
+                "Audio sample rate in Hz. Valheim has a ~50-64 kbps per-connection send limit, so keep this moderate. 16000 = good quality at ~16 KB/s. Options: 8000, 16000, or 22050.");
 
             MicrophoneDevice = config.Bind(
                 "Audio", "MicrophoneDevice", "",

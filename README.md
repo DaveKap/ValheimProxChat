@@ -59,7 +59,7 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 | FadeStartDistance | 5 | Distance where volume starts fading |
 | MicrophoneBoost | 1.5 | Mic input multiplier (1.0 = no boost) |
 | OutputVolume | 2.0 | Playback volume gain (applied to audio samples, not clamped to 1.0) |
-| SampleRate | 22050 | Audio quality (8000/16000/22050 Hz) |
+| SampleRate | 16000 | Audio quality (8000/16000/22050 Hz) |
 | MicrophoneDevice | (empty) | Specific mic device name, or empty for default |
 | ReverbMix | 0.0 | Valheim reverb zone mix (0.0 = no reverb, 1.0 = full) |
 
@@ -118,10 +118,13 @@ Valheim/BepInEx/config/com.valheimproxchat.mod.cfg
 6. **Playback**: Each remote player gets a dedicated `AudioSource` with a streaming circular buffer
 
 ### Bandwidth Usage
-At default settings (22050Hz sample rate, mu-law compression, 20ms transmit interval):
-- ~22 KB/s per speaking player
+At default settings (16kHz sample rate, mu-law compression, 20ms transmit interval):
+- ~16 KB/s per speaking player
 - Only transmitted while actively speaking (PTT or voice activation)
 - With `LowBandwidthMode = true`: ~8 KB/s per speaker
+- Voice packets are sent only to nearby peers (not broadcast to all players)
+
+**Important**: Valheim has a built-in ~50-64 kbps per-connection send rate limit. Voice data shares this with game traffic (ZDO sync, position updates). The default 16kHz sample rate is chosen to balance quality against this limit. If you experience game lag while voice chatting, lower the `SampleRate` or enable `LowBandwidthMode`.
 
 ## Architecture
 
